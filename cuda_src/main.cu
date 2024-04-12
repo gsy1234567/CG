@@ -1,5 +1,4 @@
 #include "kdTree.cuh"
-#include "obj_loader.cuh"
 
 using namespace gsy;
 

@@ -26,10 +26,30 @@ namespace gsy {
     using vec3u = Eigen::Matrix<u32, 3, 1>;
     using vec4u = Eigen::Matrix<u32, 4, 1>;
 
+    template<typename T, u8 Dim>
+    using Point = Eigen::Matrix<T, Dim, 1>;
+
+    using Point3f = Point<Float, 3>;
+    using Point2f = Point<Float, 2>;
+    using Point1f = Point<Float, 1>;
+
+    template<typename T, u8 Dim>
+    struct PointObj {
+        Point<T, Dim> point;
+        u32 index;
+    };
+
     struct Host {};
     struct Device {};
     struct Positive {};
     struct Negative {};
+
+    enum struct Axis : u8 {
+        X    = 0b00, 
+        Y    = 0b01, 
+        Z    = 0b10, 
+        None = 0b11
+    };
 }
 
 

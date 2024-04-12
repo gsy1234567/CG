@@ -6,11 +6,17 @@
 
 namespace gsy {
     struct AABB {
-        vec3f min = vec3f::Constant(Inf);
-        vec3f max = vec3f::Constant(-Inf);
+        vec3f min = vec3f::Constant(1e10);
+        vec3f max = vec3f::Constant(-1e10);
 
         __host__ __device__ AABB() = default;
         __host__ __device__ AABB(const vec3f& min, const vec3f& max) : min(min), max(max) {}
+        __host__ __device__ AABB(const AABB&) = default;
+        __host__ __device__ AABB operator=(const AABB& other) {
+            min = other.min;
+            max = other.max;
+            return *this;
+        }
         
         __host__ __device__ AABB expand(const AABB& other) {
             min = min.cwiseMin(other.min);
@@ -27,10 +33,10 @@ namespace gsy {
                     min.z() < other.max.z();
         }
 
-        template<typename X, typename Y, typename Z>
-        __host__ __device__ AABB get_eighth() const {
+        __host__ __device__ AABB get_eighth(bool x, bool y, bool z) const {
             AABB ret;
-            if constexpr (std::is_same_v<X, Negative>) {
+            
+            if (!x) {
                 ret.min.x() = min.x();
                 ret.max.x() = average(min.x(), max.x());
             } else {
@@ -38,7 +44,7 @@ namespace gsy {
                 ret.max.x() = max.x();
             }
 
-            if constexpr (std::is_same_v<Y, Negative>) {
+            if (!y) {
                 ret.min.y() = min.y();
                 ret.max.y() = average(min.y(), max.y());
             } else {
@@ -46,7 +52,7 @@ namespace gsy {
                 ret.max.y() = max.y();
             }
 
-            if constexpr (std::is_same_v<Z, Negative>) {
+            if (!z) {
                 ret.min.z() = min.z();
                 ret.max.z() = average(min.z(), max.z());
             } else {
