@@ -27,7 +27,7 @@ namespace gsy {
     };
 
     struct Triangle : public Geometry {
-        vec3f p0, p1, p2;
+        Point3f p0, p1, p2;
         vec3f n0, n1, n2;
 
         __host__ __device__ Triangle() = default;

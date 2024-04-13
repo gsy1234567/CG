@@ -20,6 +20,7 @@ namespace gsy {
     using vec2f = Eigen::Matrix<Float, 2, 1>;
     using vec3f = Eigen::Matrix<Float, 3, 1>;
     using u8    = std::uint8_t;
+    using u16   = std::uint16_t;
     using u32   = std::uint32_t;
     using u64   = std::uint64_t;
     using i32   = std::int32_t;
@@ -34,10 +35,27 @@ namespace gsy {
     using Point1f = Point<Float, 1>;
 
     template<typename T, u8 Dim>
-    struct PointObj {
+    struct ObjPoint {
         Point<T, Dim> point;
         u32 index;
     };
+
+    template<typename T>
+    struct ObjPoint<T, 1> {
+        T value;
+        u32 index;
+        ObjPoint(T v, u32 i) : value{v}, index{i} {}
+    };
+
+    template<typename T>
+    inline bool operator<(const ObjPoint<T, 1>& p0, const ObjPoint<T, 1>& p1) {
+        return p0.value < p1.value;
+    }
+
+    template<typename T>
+    inline bool operator==(const ObjPoint<T, 1>& p0, const ObjPoint<T, 1>& p1) {
+        return p0.value == p1.value; 
+    }
 
     struct Host {};
     struct Device {};
