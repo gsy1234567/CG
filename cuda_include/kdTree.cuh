@@ -275,6 +275,7 @@ namespace gsy {
                     assert(index != invalid);
                     return index < 0; 
                 }
+                __host__ bool is_valid() const { return index != invalid; }
                 __host__ bool is_inner_node() const { return !is_leaf_node(); }
                 __host__ u32 get_row_index() const { return is_leaf_node() ? -index-1 : index; }
             };
@@ -478,6 +479,10 @@ namespace gsy {
                 }
             }
 
+            __host__ inline Index get_root() const {
+                return Index{0, _innerNodes.size() > 0};
+            }
+
         public:
             KDTree(std::vector<T> geometries, u32 leafCapa) : _leafCapa(leafCapa) {
                 std::cout << "Build kdTree Begin" << std::endl;
@@ -510,6 +515,59 @@ namespace gsy {
                 std::cout << "Build kdTree End" << std::endl;
                 std::cout << "# of inner nodes: " << _innerNodes.size() << std::endl;
                 std::cout << "# of leaf  nodes: " << _leafNodes.size() << std::endl;
+            }
+
+            void optimize_leafNode() {
+                for(LeafNode& leafNode : _leafNodes) {
+                    for(u8 dir = Direction::left ; dir != Direction::none ; ++dir) {
+                        Index& idx = leafNode.neighbors[dir];
+                        if(!idx.is_valid())
+                            continue;
+                        while(!idx.is_leaf_node()) {
+                            InnerNode& innerNode = _innerNodes[idx.get_row_index()];
+                            if(is_parallel(innerNode.splitAxis, static_cast<Direction>(dir))) {
+                                idx = innerNode.children[leafNode.aabb.mid()[get_axis(static_cast<Direction>(dir))] >= innerNode.splitPos];
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            bool traversal(Ray ray, Interaction& interaction) const {
+                if(!_aabb.intersect(ray)) {
+                    return false;
+                }
+
+                Index idx = get_root();
+
+                while(ray.tMin + Eps < ray.tMax) {
+                    vec3f pEntry = ray(ray.tMin);
+
+                    //down traversal
+                    while(!idx.is_leaf_node()) {
+                        const InnerNode& currInnerNode = _innerNodes[idx.get_row_index()];
+                        idx = currInnerNode.children[pEntry[currInnerNode.splitAxis] >= currInnerNode.splitPos];
+                    }
+
+                    //At a leaf.
+                    //check for intersection with contained triangles.
+                    const LeafNode& currLeafNode = _leafNodes[idx.get_row_index()];
+                    for(u32 geometryOffset = 0 ; geometryOffset < currLeafNode.size ; ++geometryOffset) {
+                        _geometries[geometryOffset + currLeafNode.begin].intersect(interaction, ray);
+                    }
+
+                    if(interaction.type != Interaction::Type::None) {
+                        return true;
+                    }
+
+                    currLeafNode.aabb.ray_exit(ray);
+                    Direction tmpIdx = currLeafNode.aabb.get_direction(ray(ray.tMin));
+                    assert(tmpIdx != Direction::none);
+                    idx = currLeafNode.neighbors[tmpIdx];
+                }
+                return false;
             }
     };
 }

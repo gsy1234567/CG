@@ -80,6 +80,17 @@ namespace gsy {
         none = 6
     };
 
+    //left, right are parallel to X
+    //back, front are parallel to Y
+    //bottom, top are parallel to Z
+    __host__ __device__ inline bool is_parallel(Axis axis, Direction dir) {
+        return (static_cast<u8>(dir) >> 1) == static_cast<u8>(axis); 
+    }
+
+    __host__ __device__ inline Axis get_axis(Direction dir) {
+        return static_cast<Axis>(static_cast<u8>(dir) >> 1);
+    }
+
     template<typename T>
     inline T nan();
 

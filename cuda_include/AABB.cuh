@@ -2,9 +2,11 @@
 
 #include "core.cuh"
 #include "utils.cuh"
+#include "ray.cuh"
 #include <type_traits>
 
 namespace gsy {
+
     struct AABB {
         vec3f min = vec3f::Constant(1e10);
         vec3f max = vec3f::Constant(-1e10);
@@ -17,6 +19,8 @@ namespace gsy {
             max = other.max;
             return *this;
         }
+
+        __host__ __device__ vec3f mid() const { return (min + max) * static_cast<Float>(0.5); }
         
         __host__ __device__ AABB expand(const AABB& other) {
             min = min.cwiseMin(other.min);
@@ -53,6 +57,49 @@ namespace gsy {
                 return Direction::top;
             }
             return Direction::none;
+        }
+
+        __host__ __device__ bool intersect(Ray& ray) const {
+            auto x1 = (min.x() - ray.ori.x()) / ray.dir.x();
+            auto x2 = (max.x() - ray.ori.x()) / ray.dir.x();
+            auto xmin = gsy::min(x1, x2);
+            auto xmax = gsy::max(x1, x2);
+            auto y1 = (min.y() - ray.ori.y()) / ray.dir.y();
+            auto y2 = (max.y() - ray.ori.y()) / ray.dir.y();
+            auto ymin = gsy::min(y1, y2);
+            auto ymax = gsy::max(y1, y2);
+            auto z1 = (min.z() - ray.ori.z()) / ray.dir.z();
+            auto z2 = (max.z() - ray.ori.z()) / ray.dir.z();
+            auto zmin = gsy::min(z1, z2);
+            auto zmax = gsy::max(z1, z2);
+
+            auto tmpMin = gsy::max(ray.tMin, xmin, ymin, zmin);
+            auto tmpMax = gsy::min(ray.tMax, xmax, ymax, zmax);
+
+            if(tmpMin < tmpMax) {
+                ray.tMin = tmpMin;
+                ray.tMax = tmpMax;
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        /**
+         * @brief We assert the ray intersects with the AABB, then we set lambdaOut to ray.tMin
+        */
+        __host__ __device__ void ray_exit(Ray& ray) const {
+            auto x1 = (min.x() - ray.ori.x()) / ray.dir.x();
+            auto x2 = (max.x() - ray.ori.x()) / ray.dir.x();
+            auto xmax = gsy::max(x1, x2);
+            auto y1 = (min.y() - ray.ori.y()) / ray.dir.y();
+            auto y2 = (max.y() - ray.ori.y()) / ray.dir.y();
+            auto ymax = gsy::max(y1, y2);
+            auto z1 = (min.z() - ray.ori.z()) / ray.dir.z();
+            auto z2 = (max.z() - ray.ori.z()) / ray.dir.z();
+            auto zmax = gsy::max(z1, z2);
+
+            ray.tMin = gsy::min(xmax, ymax, zmax);
         }
     };
 }

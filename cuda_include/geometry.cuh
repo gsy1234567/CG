@@ -15,7 +15,7 @@ namespace gsy {
 
         __host__ __device__ Geometry() = default;
         __host__ __device__ virtual ~Geometry() = default;
-        __host__ __device__ virtual bool intersect(Interaction& interaction, const Ray& ray) const  = 0;
+        __host__ __device__ virtual bool intersect(Interaction& interaction, Ray& ray) const  = 0;
         __host__ __device__ virtual AABB get_aabb() const = 0;
         __host__ __device__ virtual Float x_min() const = 0;
         __host__ __device__ virtual Float x_max() const = 0;
@@ -35,7 +35,7 @@ namespace gsy {
             p0(p0), p1(p1), p2(p2), n0(n0), n1(n1), n2(n2) {}
         __host__ __device__ ~Triangle() = default;
 
-        __host__ __device__ bool intersect(Interaction& interaction, const Ray& ray) const override {
+        __host__ __device__ bool intersect(Interaction& interaction, Ray& ray) const override {
             vec3f e0 = p0 - p1;
             vec3f e1 = p0 - p2;
             vec3f e2 = p0 - ray.ori;
@@ -56,6 +56,8 @@ namespace gsy {
                     interaction.u = u;
                     interaction.t = v;
                     interaction.brdf = brdf;
+                    interaction.type = Interaction::Type::Geometry;
+                    ray.tMax = t;
                     return true;
                 }
             }
