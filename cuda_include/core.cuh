@@ -16,6 +16,7 @@ namespace gsy {
     constexpr Float Inf = std::numeric_limits<Float>::max();
     constexpr Float Pi  = 3.141592653589793238462643383279502884;
     constexpr Float Eps = 1e-6;
+    
 
     using vec2f = Eigen::Matrix<Float, 2, 1>;
     using vec3f = Eigen::Matrix<Float, 3, 1>;
@@ -62,12 +63,35 @@ namespace gsy {
     struct Positive {};
     struct Negative {};
 
-    enum struct Axis : u8 {
+    enum Axis : u8 {
         X    = 0b00, 
         Y    = 0b01, 
         Z    = 0b10, 
         None = 0b11
     };
+
+    enum Direction : u8 {
+        left = 0, 
+        right = 1, 
+        back = 2, 
+        front = 3,
+        bottom = 4, 
+        top = 5, 
+        none = 6
+    };
+
+    template<typename T>
+    inline T nan();
+
+    template<>
+    inline float nan<float>() {
+        return std::nanf("");
+    }
+
+    template<>
+    inline double nan<double>() {
+        return std::nan("");
+    }
 }
 
 

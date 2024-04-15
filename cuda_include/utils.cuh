@@ -29,4 +29,30 @@ namespace gsy {
         return (x + y) / static_cast<T>(2);
     }
 
+    inline __host__ __device__ float get_n_ulp_magnitude(float x, u32 n = 1U) {
+        u32* p = reinterpret_cast<u32*>(&x);
+        *p &= 0x7F80'0000U;
+        *p |= n;
+        return x;
+    }
+
+    inline __host__ __device__ double get_n_ulp_magnitude(double x, u64 n = 1ULL) {
+        u64* p = reinterpret_cast<u64*>(&x);
+        *p &= 0x7FF0'0000'0000'0000ULL;
+        *p |= n;
+        return x;
+    }
+
+    inline __host__ __device__ float fast_abs(float x) {
+        u32* p = reinterpret_cast<u32*>(&x);
+        *p &= 0x7FFF'FFFFU;
+        return x;
+    }
+
+    inline __host__ __device__ double fast_abs(double x) {
+        u64* p = reinterpret_cast<u64*>(&x);
+        *p &= 0x7FFF'FFFF'FFFF'FFFFULL;
+        return x;
+    }
+
 }

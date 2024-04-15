@@ -1,10 +1,18 @@
 #pragma once
 
 #include "core.cuh"
+#include "AABB.cuh"
+#include "intersection.cuh"
 #include <vector>
 #include <array>
 #include <utility>
 #include <iostream>
+#include <numeric>
+#include <assert.h>
+#include <queue>
+#include <unordered_map>
+#include <unordered_set>
+
 
 namespace gsy {
     #pragma pack (1)
@@ -125,9 +133,91 @@ namespace gsy {
             std::vector<GeometryType> _geometries;
             std::vector<Rope> _ropes;
             const u16 _leafCapa;
+            AABB _aabb;
+
+        /**
+         * @brief Find the leafNode of the kdTree according to `lambdaIn`, `lambdaOut`.
+         * @param[in] lambdaIn The least distance between the ray.ori and the AABB of this kdTree.
+         * @param[in] ray The input ray.
+         * @param[inout] rope As the input, it is the innerNode of this kdTree. As the output, it is the leafNode of this kdTree.
+        */
+        __host__ void down_traversal(
+            Float lambdaIn, 
+            const Ray& ray, 
+            Rope& rope
+        ) const {
+            auto pEntry = ray(lambdaIn);
+
+            while(!rope.isLeaf) {
+                switch(rope.innerNode.split0) {
+                    case Axis::X:
+                        if(pEntry.x() <= rope.innerNode.splitPos[0]) goto Step1_0;
+                        else goto Step1_1;
+                    case Axis::Y:
+                        if(pEntry.y() <= rope.innerNode.splitPos[0]) goto Step1_0;
+                        else goto Step1_1;
+                    case Axis::Z:
+                        if(pEntry.z() <= rope.innerNode.splitPos[0]) goto Step1_0;
+                        else goto Step1_1;
+                    default:
+                        std::cerr << "Invalid split0" << std::endl;
+                        exit(1);
+                }
+
+                Step1_0:
+                switch(rope.innerNode.split10) {
+                    case Axis::X:
+                        if(pEntry.x() <= rope.innerNode.splitPos[1]) goto Step2_0;
+                        else goto Step2_1;
+                    case Axis::Y:
+                        if(pEntry.y() <= rope.innerNode.splitPos[1]) goto Step2_0;
+                        else goto Step2_1;
+                    case Axis::Z:
+                        if(pEntry.y() <= rope.innerNode.splitPos[1]) goto Step2_0;
+                        else goto Step2_1;
+                    default:
+                        std::cout << "Invalid split10" << std::endl;
+                        exit(1);
+                }
+
+                Step1_1:
+                switch(rope.innerNode.split10) {
+                    case Axis::X:
+                        if(pEntry.x() <= rope.innerNode.splitPos[2]) goto Step2_2;
+                        else goto Step2_3;
+                    case Axis::Y:
+                        if(pEntry.y() <= rope.innerNode.splitPos[2]) goto Step2_2;
+                        else goto Step2_3;
+                    case Axis::Z:
+                        if(pEntry.y() <= rope.innerNode.splitPos[2]) goto Step2_2;
+                        else goto Step2_3;
+                    default:
+                        std::cout << "Invalid split11" << std::endl;
+                        exit(1);
+                }
+
+                Step2_0:
+                rope = _ropes[rope.innerNode.children[0]];
+                continue;
+                Step2_1:
+                rope = _ropes[rope.innerNode.children[1]];
+                continue;
+                Step2_2:
+                rope = _ropes[rope.innerNode.children[2]];
+                continue;
+                Step2_3:
+                rope = _ropes[rope.innerNode.children[3]];
+            }
+        }
+
         public:
-            __host__ CompressedkdTree(std::vector<GeometryType> geometries, u16 leafCapa) : 
+            __host__ CompressedkdTree<GeometryType, Host>::CompressedkdTree(std::vector<GeometryType> geometries, u16 leafCapa) : 
                 _leafCapa(leafCapa) {
+
+                for(auto geometry : geometries) {
+                    _aabb.expand(geometry.get_aabb());
+                }
+
                 //construct the original build task
                 BuildTask buildTask;
                 for(u32 i = 0 ; i < geometries.size() ; ++i) {
@@ -153,8 +243,273 @@ namespace gsy {
                 for(u32 currIndex : newIndices) {
                     _geometries.emplace_back(std::move(geometries[currIndex]));
                 }
+            }
+        
+            __host__ bool intersect(Interaction& interaction, Ray ray) const {
+                Rope currRope = _ropes[0];
+                Float lambdaIn, lambdaOut;
+                if(!ray_aabb_intersect(ray, _aabb, lambdaIn, lambdaOut))
+                    return false;
 
-                std::cout << _ropes.size() << std::endl;
+                while(lambdaIn < lambdaOut) {
+                    down_traversal(lambdaIn, ray, currRope);
+
+                    
+                }
+                return true;
+            }
+    };
+
+    template<typename T, typename Location>
+    class KDTree;
+
+    template<typename T>
+    class KDTree<T, Host> {
+        private:
+            struct Index {
+                i32 index;
+                static constexpr i32 invalid = std::numeric_limits<i32>::min();
+                __host__ Index() : index{invalid} {}
+                __host__ Index(u32 idx, bool isInnerNode) : index{isInnerNode ? static_cast<i32>(idx) : -static_cast<i32>(idx)-1} {}
+                __host__ bool is_leaf_node() const { 
+                    assert(index != invalid);
+                    return index < 0; 
+                }
+                __host__ bool is_inner_node() const { return !is_leaf_node(); }
+                __host__ u32 get_row_index() const { return is_leaf_node() ? -index-1 : index; }
+            };
+
+            struct InnerNode {
+                Axis splitAxis;
+                Float splitPos;
+                std::array<Index, 2> children;
+                __host__ InnerNode(Axis axis, Float pos, Index left, Index right) : 
+                    splitAxis(axis), 
+                    splitPos(pos), 
+                    children{left, right} {}
+    
+                __host__ InnerNode() : splitAxis(Axis::None) {}
+            };
+
+            struct LeafNode {
+                static constexpr u32 nil = static_cast<u32>(-1);
+                std::array<Index, 6> neighbors;
+                AABB aabb;
+                u32 begin;
+                u32 size;
+            };
+
+            struct BuildTask {
+                AABB aabb;
+                std::array<std::vector<ObjPoint<Float, 1>>, 3> points;
+                std::array<Index, 6> neighbors;
+                u32 parent;
+                u32 which;
+            };
+
+            std::vector<InnerNode> _innerNodes;
+            std::vector<LeafNode>  _leafNodes;
+            std::vector<T>         _geometries;
+            AABB                   _aabb;
+            const u32              _leafCapa;
+
+            __host__ static inline bool is_left(Direction dir) { return dir % 2 == 0; }
+            __host__ static inline bool is_right(Direction dir) { return dir % 2 != 0; }
+
+            __host__ inline void make_LeafNode(LeafNode& newLeafNode, std::vector<u32>& indices, const BuildTask& buildTask) {
+                newLeafNode.neighbors = buildTask.neighbors;
+                newLeafNode.aabb = buildTask.aabb;
+                newLeafNode.begin = indices.size();
+                std::unordered_set<u32> vis;
+                for(auto objPoint : buildTask.points[0]) {
+                    vis.insert(objPoint.index);
+                }
+                for(auto index : vis) {
+                    indices.emplace_back(index);
+                }
+                newLeafNode.size = vis.size();
+            }
+
+            __host__ inline void make_InnerNode(
+                InnerNode& newInnerNode, 
+                BuildTask task, 
+                BuildTask& subTask0, 
+                BuildTask& subTask1, 
+                u32& innerNodeCnt, 
+                u32& leafNodeCnt
+            ) {
+                Axis optAxis = Axis::None;
+                Float optPos = nan<Float>();
+                u32 optElements = std::numeric_limits<u32>::max();
+                std::unordered_map<u32, u8> optVis;
+                for(
+                    u8 currAxis = static_cast<u8>(Axis::X) ; 
+                    currAxis < static_cast<u8>(Axis::None) ;
+                    ++currAxis
+                ) {
+                    const std::vector<ObjPoint<Float, 1>>& currPoints = task.points[currAxis];
+                    u32 currLeft = 1;
+                    assert(task.points[currAxis].size() % 2 == 0);
+                    u32 currRight = task.points[currAxis].size() / 2;
+                    Float currSplitPos = average(currPoints[0].value, currPoints[1].value);
+                    std::unordered_map<u32, u8> vis;
+                    vis[currPoints[0].index] = 1;
+
+                    for(u32 i = 2 ; currLeft < currRight ; ++i) {
+                        currSplitPos = average(currPoints[i-1].value, currPoints[i].value);
+                        u32 currIndex = currPoints[i-1].index;
+                        auto cnt = vis[currIndex] += 1;
+                        assert(cnt == 1 || cnt == 2);
+                        if(cnt == 1) {
+                            ++currLeft;
+                        } else {
+                            --currRight;
+                        }
+                    }
+
+                    u32 currElements = currLeft + currRight;
+
+                    if(currElements < optElements) {
+                        optAxis = static_cast<Axis>(currAxis);
+                        optPos = currSplitPos;
+                        optElements = currElements;
+                        optVis = std::move(vis);
+                    }
+                }
+
+                //update the points of subTasks
+                for(int i = 0 ; i < 3 ; ++i) {
+                    subTask0.points[i].clear();
+                    subTask1.points[i].clear();
+
+                    for(auto point : task.points[i]) {
+                        auto iter = optVis.find(point.index);
+                        if(iter == optVis.end()) {
+                            subTask1.points[i].push_back(point);
+                        } else {
+                            assert(iter->second == 1 || iter->second == 2);
+                            if(iter->second == 1) {
+                                subTask1.points[i].push_back(point);
+                            }
+                            subTask0.points[i].push_back(point);
+                        }
+                    }
+                }
+
+                //update the aabb of subTasks
+                //update the neighbors of subTasks
+                subTask0.aabb = subTask1.aabb = task.aabb;
+                subTask0.neighbors = subTask1.neighbors = task.neighbors;
+
+                assert(subTask0.points[0].size() % 2 == 0);
+                bool isSubTask0Leaf = (subTask0.points[0].size() / 2) <= _leafCapa;
+                bool isSubTask1Leaf = (subTask1.points[0].size() / 2) <= _leafCapa;
+                assert(isSubTask0Leaf == isSubTask1Leaf);
+                
+                Index idx0 {isSubTask0Leaf ? leafNodeCnt++ : innerNodeCnt++, !isSubTask0Leaf };
+                Index idx1 {isSubTask1Leaf ? leafNodeCnt++ : innerNodeCnt++, !isSubTask1Leaf };
+
+                switch(optAxis) {
+                    case Axis::X:
+                        subTask0.aabb.max.x() = subTask1.aabb.min.x() = optPos;
+                        subTask0.neighbors[Direction::right] = idx1;
+                        subTask1.neighbors[Direction::left] = idx0;
+                        break;
+                    case Axis::Y:
+                        subTask0.aabb.max.y() = subTask1.aabb.min.y() = optPos;
+                        subTask0.neighbors[Direction::front] = idx1;
+                        subTask1.neighbors[Direction::back] = idx0;
+                        break;
+                    case Axis::Z:
+                        subTask0.aabb.max.z() = subTask1.aabb.min.z() = optPos;
+                        subTask0.neighbors[Direction::top] = idx1;
+                        subTask1.neighbors[Direction::bottom] = idx0;
+                        break;
+                }
+                
+                //update newInnerNode
+                newInnerNode.splitPos = optPos;
+                newInnerNode.splitAxis = optAxis;
+                newInnerNode.children[0] = idx0;
+                newInnerNode.children[1] = idx1;
+            }
+            
+
+            void build(BuildTask rootBuildTask, std::vector<u32>& indices) {
+                _innerNodes.clear();
+                _leafNodes.clear();
+                _geometries.clear();
+
+                std::queue<BuildTask> unFinishedTasks;
+                unFinishedTasks.emplace(std::move(rootBuildTask));
+                u32 leafCnt = 0;
+                u32 innerCnt = 1;
+
+                while(!unFinishedTasks.empty()) {
+                    BuildTask currBuildTask = std::move(unFinishedTasks.front());
+                    unFinishedTasks.pop();
+
+                    assert(
+                        currBuildTask.points[0].size() == currBuildTask.points[1].size() &&
+                        currBuildTask.points[1].size() == currBuildTask.points[2].size() && 
+                        currBuildTask.points[0].size() % 2 == 0
+                    );
+
+                    const u32 segmentNum = currBuildTask.points[0].size() / 2;
+
+                    if(segmentNum <= _leafCapa) {
+                        if(currBuildTask.parent != std::numeric_limits<u32>::max())
+                            _innerNodes[currBuildTask.parent].children[currBuildTask.which] = Index{_leafNodes.size(), false};
+                        _leafNodes.emplace_back();
+                        make_LeafNode(_leafNodes.back(), indices, currBuildTask);
+                    } else {
+                        std::array<BuildTask, 2> newBuildTasks;
+                        newBuildTasks[0].parent = _innerNodes.size();
+                        newBuildTasks[1].parent = _innerNodes.size();
+                        newBuildTasks[0].which = 0;
+                        newBuildTasks[1].which = 1;
+                        if(currBuildTask.parent != std::numeric_limits<u32>::max())
+                            _innerNodes[currBuildTask.parent].children[currBuildTask.which] = Index{_innerNodes.size(), true};
+                        _innerNodes.emplace_back();
+                        make_InnerNode(_innerNodes.back(), std::move(currBuildTask), newBuildTasks[0], newBuildTasks[1], innerCnt, leafCnt);
+                        unFinishedTasks.emplace(std::move(newBuildTasks[0]));
+                        unFinishedTasks.emplace(std::move(newBuildTasks[1]));
+                    }
+                }
+            }
+
+        public:
+            KDTree(std::vector<T> geometries, u32 leafCapa) : _leafCapa(leafCapa) {
+                std::cout << "Build kdTree Begin" << std::endl;
+                std::cout << "# of geometries: " << geometries.size() << std::endl;
+                BuildTask rootBuildTask;
+                std::vector<u32> indices;
+
+                for(u32 i = 0 ; i < geometries.size() ; ++i) {
+                    rootBuildTask.aabb.expand(geometries[i].get_aabb());
+                    rootBuildTask.points[0].emplace_back(geometries[i].x_min(), i);
+                    rootBuildTask.points[0].emplace_back(geometries[i].x_max(), i);
+                    rootBuildTask.points[1].emplace_back(geometries[i].y_min(), i);
+                    rootBuildTask.points[1].emplace_back(geometries[i].y_max(), i);
+                    rootBuildTask.points[2].emplace_back(geometries[i].z_min(), i);
+                    rootBuildTask.points[2].emplace_back(geometries[i].z_max(), i);
+                }
+
+                rootBuildTask.parent = std::numeric_limits<u32>::max();
+
+                std::sort(rootBuildTask.points[0].begin(), rootBuildTask.points[0].end());
+                std::sort(rootBuildTask.points[1].begin(), rootBuildTask.points[1].end());
+                std::sort(rootBuildTask.points[2].begin(), rootBuildTask.points[2].end());
+
+                build(std::move(rootBuildTask), indices);
+
+                for(auto index : indices) {
+                    _geometries.push_back(geometries[index]);
+                }
+
+                std::cout << "Build kdTree End" << std::endl;
+                std::cout << "# of inner nodes: " << _innerNodes.size() << std::endl;
+                std::cout << "# of leaf  nodes: " << _leafNodes.size() << std::endl;
             }
     };
 }

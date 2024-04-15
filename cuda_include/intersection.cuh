@@ -26,5 +26,5 @@ namespace gsy {
      * @param[out] lambdaIn The output lambda in, it is valid only if this function returns true.
      * @param[out] lambdaOut The output lambda out, it is valid only if this function returns true.
     */
-    __host__ __device__ bool intersect(const Ray& ray, const AABB& aabb, float& lambdaIn, float& lambdaOut);
+    __host__ __device__ bool ray_aabb_intersect(const Ray& ray, const AABB& aabb, float& lambdaIn, float& lambdaOut);
 }

@@ -33,34 +33,26 @@ namespace gsy {
                     min.z() < other.max.z();
         }
 
-        __host__ __device__ AABB get_eighth(bool x, bool y, bool z) const {
-            AABB ret;
-            
-            if (!x) {
-                ret.min.x() = min.x();
-                ret.max.x() = average(min.x(), max.x());
-            } else {
-                ret.min.x() = average(min.x(), max.x());
-                ret.max.x() = max.x();
+        __host__ __device__ Direction get_direction(const vec3f& point, u32 n = 1) const {
+            if(fast_abs(point.x() - min.x()) < get_n_ulp_magnitude(min.x(), 2U)) {
+                return Direction::left;
             }
-
-            if (!y) {
-                ret.min.y() = min.y();
-                ret.max.y() = average(min.y(), max.y());
-            } else {
-                ret.min.y() = average(min.y(), max.y());
-                ret.max.y() = max.y();
+            if(fast_abs(point.x() - max.x()) < get_n_ulp_magnitude(max.x(), 2U)) {
+                return Direction::right;
             }
-
-            if (!z) {
-                ret.min.z() = min.z();
-                ret.max.z() = average(min.z(), max.z());
-            } else {
-                ret.min.z() = average(min.z(), max.z());
-                ret.max.z() = max.z();
+            if(fast_abs(point.y() - min.y()) < get_n_ulp_magnitude(min.y(), 2U)) {
+                return Direction::back;
             }
-
-            return ret;
+            if(fast_abs(point.y() - max.y()) < get_n_ulp_magnitude(max.y(), 2U)) {
+                return Direction::front;
+            }
+            if(fast_abs(point.z() - min.z()) < get_n_ulp_magnitude(min.z(), 2U)) {
+                return Direction::bottom;
+            }
+            if(fast_abs(point.z() - max.z()) < get_n_ulp_magnitude(max.z(), 2U)) {
+                return Direction::top;
+            }
+            return Direction::none;
         }
     };
 }
