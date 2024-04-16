@@ -460,7 +460,7 @@ namespace gsy {
 
                     if(segmentNum <= _leafCapa) {
                         if(currBuildTask.parent != std::numeric_limits<u32>::max())
-                            _innerNodes[currBuildTask.parent].children[currBuildTask.which] = Index{_leafNodes.size(), false};
+                            _innerNodes[currBuildTask.parent].children[currBuildTask.which] = Index{static_cast<u32>(_leafNodes.size()), false};
                         _leafNodes.emplace_back();
                         make_LeafNode(_leafNodes.back(), indices, currBuildTask);
                     } else {
@@ -470,7 +470,7 @@ namespace gsy {
                         newBuildTasks[0].which = 0;
                         newBuildTasks[1].which = 1;
                         if(currBuildTask.parent != std::numeric_limits<u32>::max())
-                            _innerNodes[currBuildTask.parent].children[currBuildTask.which] = Index{_innerNodes.size(), true};
+                            _innerNodes[currBuildTask.parent].children[currBuildTask.which] = Index{static_cast<u32>(_innerNodes.size()), true};
                         _innerNodes.emplace_back();
                         make_InnerNode(_innerNodes.back(), std::move(currBuildTask), newBuildTasks[0], newBuildTasks[1], innerCnt, leafCnt);
                         unFinishedTasks.emplace(std::move(newBuildTasks[0]));
@@ -499,6 +499,8 @@ namespace gsy {
                     rootBuildTask.points[2].emplace_back(geometries[i].z_min(), i);
                     rootBuildTask.points[2].emplace_back(geometries[i].z_max(), i);
                 }
+
+                _aabb = rootBuildTask.aabb;
 
                 rootBuildTask.parent = std::numeric_limits<u32>::max();
 

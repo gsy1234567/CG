@@ -39,8 +39,8 @@ namespace gsy {
             vec3f e0 = p0 - p1;
             vec3f e1 = p0 - p2;
             vec3f e2 = p0 - ray.ori;
-            vec3f cross0 = ray.dir.cross3(e0);
-            vec3f cross1 = e2.cross3(e1);
+            vec3f cross0 = ray.dir.cross(e0);
+            vec3f cross1 = e2.cross(e1);
 
             Float det_inv = static_cast<Float>(1) / e1.dot(cross0);
             Float t = -e0.dot(cross1) * det_inv;
@@ -54,7 +54,7 @@ namespace gsy {
                 ) {
                     interaction.t = t;
                     interaction.u = u;
-                    interaction.t = v;
+                    interaction.v = v;
                     interaction.brdf = brdf;
                     interaction.type = Interaction::Type::Geometry;
                     ray.tMax = t;
