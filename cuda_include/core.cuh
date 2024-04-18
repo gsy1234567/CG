@@ -4,6 +4,7 @@
 #include <numeric>
 #include <numbers>
 #include <cstdint>
+#include "math.h"
 
 namespace gsy {
     
@@ -16,8 +17,12 @@ namespace gsy {
     constexpr Float Inf = std::numeric_limits<Float>::max();
     constexpr Float Pi  = 3.141592653589793238462643383279502884;
     constexpr Float Eps = 1e-6;
-    
 
+    template<typename T>
+    __host__ __device__ constexpr T inv_180() {
+        return static_cast<T>(1) / static_cast<T>(180);
+    }
+    
     using vec2f = Eigen::Matrix<Float, 2, 1>;
     using vec3f = Eigen::Matrix<Float, 3, 1>;
     using u8    = std::uint8_t;
@@ -25,6 +30,7 @@ namespace gsy {
     using u32   = std::uint32_t;
     using u64   = std::uint64_t;
     using i32   = std::int32_t;
+    using vec2u = Eigen::Matrix<u32, 2, 1>;
     using vec3u = Eigen::Matrix<u32, 3, 1>;
     using vec4u = Eigen::Matrix<u32, 4, 1>;
 
@@ -103,6 +109,40 @@ namespace gsy {
     inline double nan<double>() {
         return std::nan("");
     }
+
+    template<typename T>
+    inline __host__ __device__ T arctan(T x);
+
+    template<>
+    inline __host__ __device__ float arctan<float>(float x) {
+        return ::atanf(x);
+    }
+
+    template<>
+    inline __host__ __device__ double arctan<double>(double x) {
+        return ::atan(x);
+    }
+
+    template<typename T>
+    inline __host__ __device__ T pow(T base, T exp);
+
+    template<>
+    inline __host__ __device__ float pow(float base, float exp) {
+        return ::powf(base, exp);
+    }
+
+    template<>
+    inline __host__ __device__ double pow(double base, double exp) {
+        return ::pow(base, exp);
+    }
+
+    template<typename T>
+    inline __host__ __device__ T to_radian(T angle) {
+        return angle * inv_180<T>() * static_cast<T>(3.141592653589793238462643383279502884);
+    }
+
+
+
 }
 
 

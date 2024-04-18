@@ -8,6 +8,7 @@
 namespace gsy {
 
     struct AABB {
+
         vec3f min = vec3f::Constant(1e10);
         vec3f max = vec3f::Constant(-1e10);
 
