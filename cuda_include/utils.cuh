@@ -1,6 +1,9 @@
 #pragma once
 
 #include "core.cuh"
+#include <type_traits>
+#include <numeric>
+#include <cmath>
 
 namespace gsy {
     
@@ -29,18 +32,11 @@ namespace gsy {
         return (x + y) / static_cast<T>(2);
     }
 
-    inline __host__ __device__ float get_n_ulp_magnitude(float x, u32 n = 1U) {
-        u32* p = reinterpret_cast<u32*>(&x);
-        *p &= 0x7F80'0000U;
-        *p |= n;
-        return x;
-    }
-
-    inline __host__ __device__ double get_n_ulp_magnitude(double x, u64 n = 1ULL) {
-        u64* p = reinterpret_cast<u64*>(&x);
-        *p &= 0x7FF0'0000'0000'0000ULL;
-        *p |= n;
-        return x;
+    template<typename T>
+    __host__ __device__ std::enable_if_t<std::is_floating_point_v<T>, bool>
+    almost_equal(T x, T y, u32 ulp = 2) {
+        return std::fabs(x - y) < std::numeric_limits<T>::epsilon() * std::fabs(x + y) * ulp ||
+            std::fabs(x - y) < std::numeric_limits<T>::min();
     }
 
     inline __host__ __device__ float fast_abs(float x) {

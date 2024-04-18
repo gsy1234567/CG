@@ -19,7 +19,7 @@ namespace gsy {
         __host__ __device__ void look_at(const vec3f& lookAt, const vec3f& refUp) {
             front = (lookAt - pos).normalized();
             right = front.cross(refUp).normalized();
-            front = right.cross(front).normalized();
+            up = right.cross(front).normalized();
         }
         __host__ __device__ Ray generat_ray(Float dx, Float dy) const {
             assert(dx >= 0 && dx < resolution.x());

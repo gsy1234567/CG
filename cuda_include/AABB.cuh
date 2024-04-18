@@ -38,26 +38,35 @@ namespace gsy {
                     min.z() < other.max.z();
         }
 
-        __host__ __device__ Direction get_direction(const vec3f& point, u32 n = 1) const {
-            if(fast_abs(point.x() - min.x()) < get_n_ulp_magnitude(min.x(), 2U)) {
-                return Direction::left;
+        __host__ __device__ Direction get_direction(const vec3f& point) const {
+            Float v = std::numeric_limits<Float>::max();
+            Direction ret = Direction::none;
+            Float test;
+            if((test = std::fabs((point.x() - min.x()) / min.x())) < v) {
+                v = test;
+                ret = Direction::left;
             }
-            if(fast_abs(point.x() - max.x()) < get_n_ulp_magnitude(max.x(), 2U)) {
-                return Direction::right;
+            if((test = std::fabs((point.x() - max.x()) / max.x())) < v) {
+                v = test;
+                ret = Direction::right;
             }
-            if(fast_abs(point.y() - min.y()) < get_n_ulp_magnitude(min.y(), 2U)) {
-                return Direction::back;
+            if((test = std::fabs((point.y() - min.y()) / min.y())) < v) {
+                v = test;
+                ret = Direction::back;
             }
-            if(fast_abs(point.y() - max.y()) < get_n_ulp_magnitude(max.y(), 2U)) {
-                return Direction::front;
+            if((test = std::fabs((point.y() - max.y()) / max.y())) < v) {
+                v = test;
+                ret = Direction::front;
             }
-            if(fast_abs(point.z() - min.z()) < get_n_ulp_magnitude(min.z(), 2U)) {
-                return Direction::bottom;
+            if((test = std::fabs((point.z() - min.z()) / min.z())) < v) {
+                v = test;
+                ret = Direction::bottom;
             }
-            if(fast_abs(point.z() - max.z()) < get_n_ulp_magnitude(max.z(), 2U)) {
-                return Direction::top;
+            if((test = std::fabs((point.z() - max.z()) / max.z())) < v) {
+                v = test;
+                ret = Direction::top;
             }
-            return Direction::none;
+            return ret;
         }
 
         __host__ __device__ bool intersect(Ray& ray) const {
@@ -89,18 +98,60 @@ namespace gsy {
         /**
          * @brief We assert the ray intersects with the AABB, then we set lambdaOut to ray.tMin
         */
-        __host__ __device__ void ray_exit(Ray& ray) const {
+        __host__ __device__ Direction ray_exit(Ray& ray) const {
             auto x1 = (min.x() - ray.ori.x()) / ray.dir.x();
             auto x2 = (max.x() - ray.ori.x()) / ray.dir.x();
-            auto xmax = gsy::max(x1, x2);
+            Direction dirx;
+            Float xmax;
+            if(x1 > x2) {
+                dirx = Direction::left;
+                xmax = x1;
+            } else {
+                dirx = Direction::right;
+                xmax = x2;
+            }
+
             auto y1 = (min.y() - ray.ori.y()) / ray.dir.y();
             auto y2 = (max.y() - ray.ori.y()) / ray.dir.y();
-            auto ymax = gsy::max(y1, y2);
+            Direction diry;
+            Float ymax;
+            if(y1 > y2) {
+                diry = Direction::back;
+                ymax = y1;
+            } else {
+                diry = Direction::front;
+                ymax = y2;
+            }
+
             auto z1 = (min.z() - ray.ori.z()) / ray.dir.z();
             auto z2 = (max.z() - ray.ori.z()) / ray.dir.z();
-            auto zmax = gsy::max(z1, z2);
+            Direction dirz;
+            Float zmax;
+            if(z1 > z2) {
+                dirz = Direction::bottom;
+                zmax = z1;
+            } else {
+                dirz = Direction::top;
+                zmax = z2;
+            }
 
-            ray.tMin = gsy::min(xmax, ymax, zmax);
+            Direction dirxy;
+            Float xymin;
+            if(xmax <= ymax) {
+                xymin = xmax;
+                dirxy = dirx;
+            } else {
+                xymin = ymax;
+                dirxy = diry;
+            }
+
+            if(xymin <= zmax) {
+                ray.tMin = xymin;
+                return dirxy;
+            } else {
+                ray.tMin = zmax;
+                return dirz;
+            }
         }
     };
 }

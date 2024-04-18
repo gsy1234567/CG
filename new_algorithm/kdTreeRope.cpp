@@ -6,6 +6,7 @@
 #include <utility>
 #include <array>
 #include <algorithm>
+#include <cmath>
 
 enum struct Axis : unsigned char {
     X = 0b00, 

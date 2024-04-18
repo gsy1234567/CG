@@ -564,10 +564,10 @@ namespace gsy {
                         return true;
                     }
 
-                    currLeafNode.aabb.ray_exit(ray);
-                    Direction tmpIdx = currLeafNode.aabb.get_direction(ray(ray.tMin));
-                    assert(tmpIdx != Direction::none);
-                    idx = currLeafNode.neighbors[tmpIdx];
+                    auto dir = currLeafNode.aabb.ray_exit(ray);
+                    
+                    idx = currLeafNode.neighbors[dir];
+
                 }
                 return false;
             }
